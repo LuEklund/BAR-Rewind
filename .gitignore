@@ -1,0 +1,30 @@
+# build
+zig-out/
+.zig-cache/
+zig-pkg/
+
+# replay data and screenshots (large, generated from BAR files)
+out/
+cache/
+*.jsonl
+*.curves
+*.ppm
+
+# claude / editors
+.claude/
+CLAUDE.local.md
+.idea/
+.vscode/
+*.swp
+
+# python
+__pycache__/
+
+# generated per match by bake export-lua (player names)
+recoil/barreplay.sdd/replay/
+dist/
+
+# local only: the parked Vulkan viewer, dev notes and reference screenshots
+vulkan-viewer/
+ref/
+PROGRESS.md

@@ -1,0 +1,7 @@
+{
+	"ui": {
+		"playersList": {
+			"aiName": "%{name}"
+		}
+	}
+}
