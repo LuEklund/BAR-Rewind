@@ -23,6 +23,7 @@ local S = Spring
 local file = nil
 local lastPiece = {} -- [unitID][piece] = last written matrix, only changes are written
 local seenPieces = {} -- [defID] = true once its piece tree is written
+local aimPieces = {} -- [defID] = the pieces that aim: each weapon's muzzle piece and its parents up to the root
 local features = {} -- [featureID] = true
 
 -- json -----------------------------------------------------------------------------------------
@@ -173,6 +174,27 @@ local function writePieces(u, def)
 		offsets[i] = info.offset or { 0, 0, 0 }
 	end
 	line("pieces", { def = def, names = names, parents = parents, offsets = offsets })
+
+	-- only these are recorded: BAR's script animates the rest (legs, walk bob) from the movement
+	local index, aim, list = {}, {}, {}
+	for i = 1, #names do index[names[i]] = i end
+	for w = 1, #(UnitDefs[def].weapons or {}) do
+		local mx, my, mz = S.GetUnitWeaponVectors(u, w)
+		local muzzle, best = nil, math.huge
+		for i = 1, mx and #names or 0 do
+			local px, py, pz = S.GetUnitPiecePosDir(u, i)
+			local d = px and (px - mx) ^ 2 + (py - my) ^ 2 + (pz - mz) ^ 2 or math.huge
+			if d < best then muzzle, best = i, d end
+		end
+		local i = muzzle
+		-- up to and with the root: piece curves are relative to their parent's, and roots can carry a turn
+		while i and not aim[i] do
+			aim[i] = true
+			list[#list + 1] = i
+			i = index[parents[i]]
+		end
+	end
+	aimPieces[def] = list
 end
 
 -- per-frame: binary, into bardump.bin ------------------------------------------------------------
@@ -191,12 +213,13 @@ for id, d in pairs(UnitDefs) do isBuilder[id] = d.isBuilder end
 local UNIT_ROW, PIECE_ROW, FEATURE_ROW, PROJECTILE_ROW, TERRAIN_ROW = 23, 14, 8, 10, 4
 local QUEUE_EVERY = 30
 
--- every piece whose model-space matrix moved since it was last written; returns the new row end
-local function recordPieces(u, ps, np)
+-- every aim piece whose model-space matrix moved since it was last written; returns the new row end
+local function recordPieces(u, def, ps, np)
 	local last = lastPiece[u]
 	if not last then last = {}; lastPiece[u] = last end
-	local n = #(S.GetUnitPieceList(u) or {})
-	for p = 1, n do
+	local aim = aimPieces[def]
+	for k = 1, #aim do
+		local p = aim[k]
 		local m11, m21, m31, _, m12, m22, m32, _, m13, m23, m33, _, tx, ty, tz = S.GetUnitPieceMatrix(u, p)
 		if m11 then
 			local l = last[p]
@@ -224,7 +247,8 @@ local function unitsSample(us, ps)
 	for i = 1, #units do
 		local u = units[i]
 		local x, y, z = S.GetUnitPosition(u)
-		if x then
+		-- a killed unit lingers while its death animation runs: the player's kill replays that
+		if x and not S.GetUnitIsDead(u) then
 			alive[u] = true
 			local def = S.GetUnitDefID(u) or 0
 			local fx, fy, fz, _, _, _, ux, uy, uz = S.GetUnitDirection(u)
@@ -258,9 +282,9 @@ local function unitsSample(us, ps)
 			nu = nu + UNIT_ROW
 
 			if not seenPieces[def] then writePieces(u, def) end
-			-- every piece's motion: the player sets pieces from these curves, so turrets point right
-			-- after a seek and walk cycles play in reverse
-			np = recordPieces(u, ps, np)
+			-- aim pieces' motion: the player sets them from these curves, so turrets and torsos point
+			-- right after a seek
+			np = recordPieces(u, def, ps, np)
 		end
 	end
 	for u in pairs(lastPiece) do if not alive[u] then lastPiece[u] = nil end end

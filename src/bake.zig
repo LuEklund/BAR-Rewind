@@ -385,7 +385,7 @@ pub fn main(init: std.process.Init) !void {
         unit.tracks = .{ .first = @intCast(tracks.items.len), .count = 0 };
         const parents: []const u32 = b.parents.get(u.unit.def) orelse &.{};
         const offsets: []const [3]f32 = b.offsets.get(u.unit.def) orelse &.{};
-        // pieces with recorded motion (the dump records it for armed buildings) play from their
+        // aim pieces (each weapon's muzzle and its parents, as the dump records them) play from their
         // curves; everything else is animated by BAR's own unit scripts (as PA does)
         for (u.tracks.items, 1..) |track, piece| {
             if (track.items.len == 0) continue;

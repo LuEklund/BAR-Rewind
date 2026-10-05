@@ -24,15 +24,30 @@ Up/Down change the speed. At 64x a whole match unwinds in seconds.
 
 ![A match playing backwards at 64x](docs/play-backwards-64x.gif)
 
+## What's recorded
+
+The parse keeps only the keyframes playback needs: a key is dropped when interpolating without it stays
+within 0.5 elmo. What it records:
+
+- **Every unit:** position, facing, health, build progress, on/off, what its weapon aims at, what it builds
+- **Aim pieces:** each weapon's barrel and everything it hangs from (torso, turret, arms), so a turret
+  points the right way the moment you jump to any time
+- **Projectiles**, **features** (wrecks, trees), **terrain changes** and **build queues**
+
+BAR animates the rest itself, from the recorded movement: walk cycles, idle motion, deaths and explosions.
+
 ## Numbers
 
 One 53-minute match (2240 units, 14k projectiles) on a Ryzen 7 5800X:
 
 | | |
 |-|-|
-| Replay (`.sdfz`) | 1.7 MB |
-| Parse (once per replay) | about 7 min |
-| Parsed replay (`.curves`) | 174 MB |
+| BAR replay (`.sdfz`) | 1.7 MB |
+| Parse (once per replay) | 6 min |
+| Parsed replay (`.curves`) | 108 MB |
+
+
+A 16-minute match parses in under a minute, to 12 MB.
 
 ## Install
 

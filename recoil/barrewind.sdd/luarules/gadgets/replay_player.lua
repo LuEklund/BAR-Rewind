@@ -347,7 +347,7 @@ local function spawnUnit(i, r)
 	local u = CreateUnit(name, v[1], v[2], v[3], 0, teamOf(r.team))
 	if not u then return warnOnce("CreateUnit failed: " .. name .. " team " .. r.team) end
 	MoveCtrl.Enable(u)
-	-- BAR's own script animates: weapons may aim at the recorded targets but never fire
+	-- BAR's own script animates: weapons never fire
 	for w = 1, #(UnitDefs[UnitDefNames[name].id].weapons or {}) do
 		Spring.SetUnitWeaponState(u, w, "reloadState", 1e8)
 	end
@@ -393,11 +393,8 @@ local function applyPose()
 		local tr = r.tracks[k]
 		local sp = map[tr.piece]
 		local v = sp and sampleW("pose_keys", tr.index, 6, t, POSE)
-		-- only pieces that moved: static buildings cost nothing
-		local l = tr.last
-		if v and not (l and math.abs(l[1] - v[1]) + math.abs(l[2] - v[2]) + math.abs(l[3] - v[3])
-				+ math.abs(l[4] - v[4]) + math.abs(l[5] - v[5]) + math.abs(l[6] - v[6]) < 1e-4) then
-			tr.last = { v[1], v[2], v[3], v[4], v[5], v[6] }
+		-- every frame: BAR's script runs too and would turn these pieces between keys
+		if v then
 			Turn(sp, 1, v[1]) Turn(sp, 2, v[2]) Turn(sp, 3, v[3])
 			Move(sp, 1, v[4]) Move(sp, 2, v[5]) Move(sp, 3, v[6])
 		end
@@ -482,7 +479,7 @@ local function work(u, r, g)
 end
 
 -- scripts animate from state, like PA: moving -> StartMoving (walk cycles), target -> weapons aim.
--- `posed` units have recorded piece motion instead: they only get velocity and builder work
+-- `posed` units have their aim pieces recorded: they get no target, the curves aim them
 animate = function(u, r, v, posed)
 	-- velocity from one frame back, inside the current window only: sampling t - 1 across a window
 	-- boundary would swap windows once per unit. On the boundary frame the last motion carries on.
@@ -494,7 +491,7 @@ animate = function(u, r, v, posed)
 		MoveCtrl.SetVelocity(u, vx, vy, vz)
 		moving = vx * vx + vz * vz > 0.01
 	end
-	if moving ~= r.moving and not posed then
+	if moving ~= r.moving then
 		r.moving = moving
 		callScript(u, moving and "StartMoving" or "StopMoving", 0)
 	end
@@ -560,20 +557,7 @@ local function place(u, r)
 	end
 	local fx, fy, fz = 2 * (x * z + y * w), 2 * (y * z - x * w), 1 - 2 * (x * x + y * y)
 	local ux, uy, uz = 2 * (x * y - z * w), 1 - 2 * (x * x + z * z), 2 * (y * z + x * w)
-	-- DEBUG flip hunt: did anything turn the unit since last frame's SetUnitDirection?
-	local ax, ay, az = Spring.GetUnitDirection(u)
-	if r.dbg_fx and ax * r.dbg_fx + ay * r.dbg_fy + az * r.dbg_fz < 0 then
-		Spring.Echo(string.format("FLIP since last frame: %s t=%.2f set=(%.2f,%.2f,%.2f) now=(%.2f,%.2f,%.2f)", M.defs[r.def], t, r.dbg_fx, r.dbg_fy, r.dbg_fz, ax, ay, az))
-	end
-	if r.dbg_fx and fx * r.dbg_fx + fy * r.dbg_fy + fz * r.dbg_fz < 0 then
-		Spring.Echo(string.format("FLIP in curve: %s t=%.2f prev_t=%.2f last=(%.2f,%.2f,%.2f) new=(%.2f,%.2f,%.2f) q=(%.3f,%.3f,%.3f,%.3f)", M.defs[r.def], t, last_t, r.dbg_fx, r.dbg_fy, r.dbg_fz, fx, fy, fz, v[4], v[5], v[6], v[7]))
-	end
 	SetUnitDirection(u, fx, fy, fz, fy * uz - fz * uy, fz * ux - fx * uz, fx * uy - fy * ux)
-	ax, ay, az = Spring.GetUnitDirection(u)
-	if ax * fx + ay * fy + az * fz < 0.99 then
-		Spring.Echo(string.format("FLIP on set: %s t=%.2f set=(%.2f,%.2f,%.2f) got=(%.2f,%.2f,%.2f)", M.defs[r.def], t, fx, fy, fz, ax, ay, az))
-	end
-	r.dbg_fx, r.dbg_fy, r.dbg_fz = fx, fy, fz
 	local s = sampleW("statuses", r.index, 4, t, ST)
 	if s then
 		SetUnitHealth(u, { health = math.max(s[1], 1), build = s[3] })
@@ -592,8 +576,8 @@ local function place(u, r)
 		end
 	end
 	r.u = u
-	-- recorded piece motion: set straight from the curves (right after a seek and in reverse);
-	-- units without any keep BAR's script animation
+	-- recorded aim pieces: set straight from the curves (right after a seek and in reverse);
+	-- BAR's script animates everything else
 	local posed = #r.tracks > 0
 	if posed then
 		pose_unit = r
@@ -628,7 +612,6 @@ local function syncUnits()
 				if u then live[r.id] = u end
 				r.on, r.moving, r.target_type, r.hidden = nil, nil, nil, nil
 				r.work_cmd, r.work_target, r.work_power = nil, nil, nil
-				for k = 1, #r.tracks do r.tracks[k].last = nil end
 			end
 			if u then place(u, r) end
 		end

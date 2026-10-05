@@ -291,8 +291,8 @@ test "basisQuat round trips front and up, half turns included" {
 }
 
 /// Turn angles (pitch, yaw, roll) whose composition in Recoil
-/// (RotateY(yaw) * RotateX(pitch) * RotateZ(roll), each rotating by the negated angle) gives the
-/// rotation part of `m`. Standard YXZ decomposition of R = Ry(-yaw) Rx(-pitch) Rz(-roll).
+/// (RotateY(yaw) * RotateX(pitch) * RotateZ(roll)) gives the rotation part of `m`. Standard YXZ
+/// decomposition of R = Ry(yaw) Rx(pitch) Rz(roll), checked against the engine's own piece matrices.
 pub fn recoilAngles(m: [12]f32) [3]f32 {
     // R[i][j] = m[3 * j + i]
     const r02 = m[6];
@@ -303,12 +303,12 @@ pub fn recoilAngles(m: [12]f32) [3]f32 {
     const a = std.math.atan2(r02, r22);
     const b = std.math.asin(std.math.clamp(-r12, -1, 1));
     const c = std.math.atan2(r10, r11);
-    return .{ -b, -a, -c };
+    return .{ b, a, c };
 }
 
-/// Of the two Turn-angle triples giving the same rotation, (p, y, r) and (pi - p, y + pi, r + pi)
-/// in Recoil's sign convention, the one nearest `previous`, each angle unwrapped towards it: keys
-/// on different branches lerp through a half turn.
+/// Of the two Turn-angle triples giving the same rotation, (p, y, r) and (pi - p, y + pi, r + pi),
+/// the one nearest `previous`, each angle unwrapped towards it: keys on different branches lerp
+/// through a half turn.
 pub fn nearestAngles(angles: [3]f32, previous: [3]f32) [3]f32 {
     const pi = std.math.pi;
     const same = unwrap(angles, previous);
@@ -363,17 +363,17 @@ test "recoil angles reproduce the rotation" {
         m[3 * j + i] = r[i][j];
     };
     const got = recoilAngles(m);
-    try std.testing.expectApproxEqAbs(-b, got[0], 1e-5);
-    try std.testing.expectApproxEqAbs(-a, got[1], 1e-5);
-    try std.testing.expectApproxEqAbs(-c, got[2], 1e-5);
+    try std.testing.expectApproxEqAbs(b, got[0], 1e-5);
+    try std.testing.expectApproxEqAbs(a, got[1], 1e-5);
+    try std.testing.expectApproxEqAbs(c, got[2], 1e-5);
 }
 
 /// Piece-space transform (PieceKey layout) from a pose and the piece's original offset: the
 /// inverse of recoilAngles + move, i.e. what Recoil composes as T(offset + move) * R(angles).
 pub fn poseMatrix(pose: [6]f32, offset: [3]f32) [12]f32 {
-    const a = -pose[1];
-    const b = -pose[0];
-    const c = -pose[2];
+    const a = pose[1];
+    const b = pose[0];
+    const c = pose[2];
     const ca, const sa = .{ @cos(a), @sin(a) };
     const cb, const sb = .{ @cos(b), @sin(b) };
     const cc, const sc = .{ @cos(c), @sin(c) };
