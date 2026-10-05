@@ -53,7 +53,8 @@ zig build dist                   # dist/bar-replay-linux.tar.gz and dist/bar-rep
 
 ## AI disclosure
 
-The code was written by AI. I guided it: I came up with the ideas and talked through what to build and how.
+The code was written by AI. I guided it: Provided sources, how to connect ideas, coming up with ideas on how to solve problems, talked it through what to build and how. 
+(To save time and provide a tool quickly).
 
 ## License
 
