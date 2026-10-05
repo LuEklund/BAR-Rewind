@@ -4,7 +4,7 @@
 #        pipeline.py play <demo.sdfz> [camera.json shot.png]   (parsed before)
 # The whole pipeline, Linux and Windows, Python stdlib only:
 #   parse: BAR's headless engine re-simulates the replay with lua/dump_replay.lua -> dump -> bake -> .curves
-#   play:  bake export-lua -> the BAR Replay mutator, copied into BAR's games/ folder -> BAR starts
+#   play:  bake export-lua -> the BAR Rewind mutator, copied into BAR's games/ folder -> BAR starts
 # Settings (BAR data folder, out folder) live in config_path(); the CLI and the app share them.
 # Shot mode (camera.json from BAR, out.png): jumps to the camera's frame, screenshots and quits;
 # SHOT_UI=1 keeps the interface, SHOT_SEEK / SHOT_LEAD / SHOT_SPEED / SHOT_BENCH tune it.
@@ -14,7 +14,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 WINDOWS = os.name == "nt"
 EXE = ".exe" if WINDOWS else ""
-MUTATOR = ROOT / "recoil" / "barreplay.sdd"
+MUTATOR = ROOT / "recoil" / "barrewind.sdd"
 WIDGET = ROOT / "lua" / "dump_replay.lua"
 
 
@@ -22,7 +22,7 @@ WIDGET = ROOT / "lua" / "dump_replay.lua"
 
 def config_path():
     base = os.environ.get("APPDATA") if WINDOWS else os.environ.get("XDG_CONFIG_HOME")
-    return Path(base or Path.home() / ".config") / "bar-replay.json"
+    return Path(base or Path.home() / ".config") / "bar-rewind.json"
 
 
 # where BAR keeps its data (engine/, games/, maps/, demos/) on each kind of install
@@ -135,7 +135,7 @@ def parse(cfg, demo):
     """Generator: yields ("proc", Popen) once (kill it to cancel), then ("progress", pct, text).
     Leaves <out>/curves/<name>.curves; raises RuntimeError with the log path on failure."""
     bar, demo = Path(cfg["bar_data"]), Path(demo).resolve()
-    if script_field(demo_script(demo), "gametype").startswith("BAR Replay"):
+    if script_field(demo_script(demo), "gametype").startswith("BAR Rewind"):
         raise RuntimeError(f"{demo.name} is a recording of this player, not a match")
     curves = curves_path(cfg, demo)
     curves.parent.mkdir(parents=True, exist_ok=True)
@@ -228,7 +228,7 @@ def start_script(meta, replay_script):
     teams = re.findall(r'\[(\d+)\] = \{ color = \{ ([\d.]+), ([\d.]+), ([\d.]+) \}, ally = (-?\d+)', meta)
     ids = sorted(int(t[0]) for t in teams)
     players = [t for t in teams if int(t[0]) != ids[-1]]  # highest team is Gaia
-    out = ["[GAME]", "{", f"\tMapName={mapname};", "\tGameType=BAR Replay dev;", "\tIsHost=1;", "\tOnlyLocal=1;",
+    out = ["[GAME]", "{", f"\tMapName={mapname};", "\tGameType=BAR Rewind dev;", "\tIsHost=1;", "\tOnlyLocal=1;",
            "\tMyPlayerName=viewer;", "\tStartPosType=0;", "\tRecordDemo=0;",
            "\t[PLAYER0]", "\t{", "\t\tName=viewer;", "\t\tSpectator=1;", "\t}"]
     # the replay's own allyteams (numbered densely): weapons can only aim at enemies. Nothing fires:
@@ -274,7 +274,7 @@ def play(cfg, demo, shot=None):
     # the replay's own start script gives the game version and options it ran with
     replay_script = demo_script(demo)
     gametype = script_field(replay_script, "gametype")
-    version = gametype if gametype != "?" and not gametype.startswith("BAR Replay") else newest_game(bar)
+    version = gametype if gametype != "?" and not gametype.startswith("BAR Rewind") else newest_game(bar)
     modinfo = game / "modinfo.lua"
     modinfo.write_text(re.sub(r"depend = \{.*\}", f'depend = {{ "{version}" }}', modinfo.read_text()))
     play_script = out_dir / "play_script.txt"

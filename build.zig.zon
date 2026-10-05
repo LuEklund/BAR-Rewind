@@ -1,7 +1,7 @@
 .{
-    .name = .bar_replay,
+    .name = .bar_rewind,
     .version = "0.0.0",
-    .fingerprint = 0x2e9d733e6c91ede9,
+    .fingerprint = 0x511ff97a692e20ec,
     .minimum_zig_version = "0.16.0",
     .dependencies = .{},
     .paths = .{ "build.zig", "build.zig.zon", "src" },

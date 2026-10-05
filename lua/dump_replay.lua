@@ -1,7 +1,7 @@
 function widget:GetInfo()
 	return {
 		name = "Replay Dump v2",
-		desc = "Dumps a replay to bardump.jsonl for bar-replay. Idle unless bardump.request exists.",
+		desc = "Dumps a replay to bardump.jsonl for bar-rewind. Idle unless bardump.request exists.",
 		author = "lucas",
 		date = "2026-09-27",
 		license = "GPL v2",

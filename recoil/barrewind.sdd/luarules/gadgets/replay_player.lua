@@ -1,7 +1,7 @@
 function gadget:GetInfo()
 	return {
 		name = "Replay Player",
-		desc = "Plays bar-replay curves: every unit, piece and feature is placed from the curves at time t",
+		desc = "Plays bar-rewind curves: every unit, piece and feature is placed from the curves at time t",
 		author = "lucas",
 		license = "GPL v2",
 		layer = 0,
@@ -560,7 +560,20 @@ local function place(u, r)
 	end
 	local fx, fy, fz = 2 * (x * z + y * w), 2 * (y * z - x * w), 1 - 2 * (x * x + y * y)
 	local ux, uy, uz = 2 * (x * y - z * w), 1 - 2 * (x * x + z * z), 2 * (y * z + x * w)
+	-- DEBUG flip hunt: did anything turn the unit since last frame's SetUnitDirection?
+	local ax, ay, az = Spring.GetUnitDirection(u)
+	if r.dbg_fx and ax * r.dbg_fx + ay * r.dbg_fy + az * r.dbg_fz < 0 then
+		Spring.Echo(string.format("FLIP since last frame: %s t=%.2f set=(%.2f,%.2f,%.2f) now=(%.2f,%.2f,%.2f)", M.defs[r.def], t, r.dbg_fx, r.dbg_fy, r.dbg_fz, ax, ay, az))
+	end
+	if r.dbg_fx and fx * r.dbg_fx + fy * r.dbg_fy + fz * r.dbg_fz < 0 then
+		Spring.Echo(string.format("FLIP in curve: %s t=%.2f prev_t=%.2f last=(%.2f,%.2f,%.2f) new=(%.2f,%.2f,%.2f) q=(%.3f,%.3f,%.3f,%.3f)", M.defs[r.def], t, last_t, r.dbg_fx, r.dbg_fy, r.dbg_fz, fx, fy, fz, v[4], v[5], v[6], v[7]))
+	end
 	SetUnitDirection(u, fx, fy, fz, fy * uz - fz * uy, fz * ux - fx * uz, fx * uy - fy * ux)
+	ax, ay, az = Spring.GetUnitDirection(u)
+	if ax * fx + ay * fy + az * fz < 0.99 then
+		Spring.Echo(string.format("FLIP on set: %s t=%.2f set=(%.2f,%.2f,%.2f) got=(%.2f,%.2f,%.2f)", M.defs[r.def], t, fx, fy, fz, ax, ay, az))
+	end
+	r.dbg_fx, r.dbg_fy, r.dbg_fz = fx, fy, fz
 	local s = sampleW("statuses", r.index, 4, t, ST)
 	if s then
 		SetUnitHealth(u, { health = math.max(s[1], 1), build = s[3] })

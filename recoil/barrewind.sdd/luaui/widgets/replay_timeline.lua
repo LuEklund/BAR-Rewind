@@ -1,7 +1,7 @@
 function widget:GetInfo()
 	return {
 		name = "Replay Timeline",
-		desc = "Scrub bar for BAR Replay: drag to seek, << / >> buttons rewind and fast-forward (click again: 2x faster), Space play/pause, R reverse, Left/Right 10 s, Up/Down speed",
+		desc = "Scrub bar for BAR Rewind: drag to seek, << / >> buttons rewind and fast-forward (click again: 2x faster), Space play/pause, R reverse, Left/Right 10 s, Up/Down speed",
 		author = "lucas",
 		license = "GPL v2",
 		layer = 10000,

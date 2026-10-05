@@ -21,10 +21,8 @@ CLAUDE.local.md
 __pycache__/
 
 # generated per match by bake export-lua (player names)
-recoil/barreplay.sdd/replay/
+recoil/barrewind.sdd/replay/
 dist/
 
-# local only: the parked Vulkan viewer, dev notes and reference screenshots
-vulkan-viewer/
-ref/
-PROGRESS.md
+# raw screen recordings (the README uses the small ones in docs/)
+/*.gif

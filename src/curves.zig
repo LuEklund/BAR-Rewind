@@ -306,6 +306,40 @@ pub fn recoilAngles(m: [12]f32) [3]f32 {
     return .{ -b, -a, -c };
 }
 
+/// Of the two Turn-angle triples giving the same rotation, (p, y, r) and (pi - p, y + pi, r + pi)
+/// in Recoil's sign convention, the one nearest `previous`, each angle unwrapped towards it: keys
+/// on different branches lerp through a half turn.
+pub fn nearestAngles(angles: [3]f32, previous: [3]f32) [3]f32 {
+    const pi = std.math.pi;
+    const same = unwrap(angles, previous);
+    const other = unwrap(.{ -pi - angles[0], angles[1] - pi, angles[2] - pi }, previous);
+    return if (distance(other, previous) < distance(same, previous)) other else same;
+}
+
+fn unwrap(angles: [3]f32, previous: [3]f32) [3]f32 {
+    var out = angles;
+    for (&out, previous) |*a, p| {
+        a.* -= 2 * std.math.pi * @round((a.* - p) / (2 * std.math.pi));
+    }
+    return out;
+}
+
+fn distance(a: [3]f32, b: [3]f32) f32 {
+    return @abs(a[0] - b[0]) + @abs(a[1] - b[1]) + @abs(a[2] - b[2]);
+}
+
+test "nearest angles stay on the previous branch through gimbal lock" {
+    const before: [3]f32 = .{ -1.4463259, -0.00067412667, -0.0009305174 };
+    const flipped: [3]f32 = .{ -1.5448614, -3.137667, -3.1378965 }; // recorded right after `before`
+    const near = nearestAngles(flipped, before);
+    try std.testing.expect(distance(near, before) < 0.2);
+    const m = poseMatrix(near ++ [3]f32{ 0, 0, 0 }, .{ 0, 0, 0 });
+    const want = poseMatrix(flipped ++ [3]f32{ 0, 0, 0 }, .{ 0, 0, 0 });
+    for (m, want) |x, y| try std.testing.expectApproxEqAbs(y, x, 1e-4);
+    // a full spin is kept as a spin, not folded back
+    try std.testing.expectApproxEqAbs(@as(f32, -6.4), nearestAngles(.{ 0, -0.1168147, 0 }, .{ 0, -6.2, 0 })[1], 1e-4);
+}
+
 test "recoil angles reproduce the rotation" {
     // R = Ry(a) Rx(b) Rz(c), column-major 3x3 then padded to 12
     const a: f32 = 0.4;

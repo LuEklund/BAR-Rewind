@@ -1,7 +1,7 @@
 function widget:GetInfo()
 	return {
 		name = "Replay Build Queues",
-		desc = "BAR Replay: every builder's queued buildings at the replay time, drawn as blueprints",
+		desc = "BAR Rewind: every builder's queued buildings at the replay time, drawn as blueprints",
 		author = "lucas",
 		license = "GPL v2",
 		layer = 56,

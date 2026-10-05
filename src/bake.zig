@@ -406,11 +406,7 @@ pub fn main(init: std.process.Init) !void {
                 for (&angles) |*a| if (std.math.isNan(a.*)) {
                     a.* = 0;
                 };
-                // unwrap so interpolation never swings the long way round
-                if (i > 0) for (&angles, previous) |*a, p| {
-                    while (a.* - p > std.math.pi) a.* -= 2 * std.math.pi;
-                    while (a.* - p < -std.math.pi) a.* += 2 * std.math.pi;
-                };
+                if (i > 0) angles = curves.nearestAngles(angles, previous);
                 previous = angles;
                 out.* = .{ .t = k.t, .v = .{ angles[0], angles[1], angles[2], local[9] - offset[0], local[10] - offset[1], local[11] - offset[2] } };
             }

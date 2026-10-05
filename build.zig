@@ -30,7 +30,7 @@ pub fn build(b: *std.Build) void {
     b.step("run", "Open the app, or play one replay: zig build run -- <demo.sdfz> (parsed once, cached)").dependOn(&run_app.step);
 
     const run_dist = b.addSystemCommand(&.{ python, b.pathFromRoot("tools/dist.py") });
-    b.step("dist", "Pack dist/bar-replay-linux.tar.gz and dist/bar-replay-windows.zip").dependOn(&run_dist.step);
+    b.step("dist", "Pack dist/bar-rewind-linux.tar.gz and dist/bar-rewind-windows.zip").dependOn(&run_dist.step);
 
     // tests -----------------------------------------------------------------------------------
     const tests = b.addTest(.{ .root_module = b.createModule(.{

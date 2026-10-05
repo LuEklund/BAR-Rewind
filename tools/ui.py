@@ -2,7 +2,7 @@
 # Usage: tools/ui.py   (or: zig build run)
 # The app: a local page in the browser listing replays with their minimaps; parse or play one, with a
 # progress bar. Python stdlib only, Linux and Windows. The work is in pipeline.py.
-import json, threading, webbrowser
+import json, threading, time, webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote
@@ -29,7 +29,7 @@ def replays():
     rows = []
     for demo in demos:
         info = pipeline.demo_info(demo)
-        if not info or info["game"].startswith("BAR Replay"):  # recordings of this player itself
+        if not info or info["game"].startswith("BAR Rewind"):  # recordings of this player itself
             continue
         rows.append({"file": demo.name, "date": demo.name[:16].replace("_", " "), "map": info["map"],
                      "players": info["players"], "length": info["length"],
@@ -72,6 +72,8 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
+        global last_seen
+        last_seen = time.monotonic()
         if self.path == "/":
             return self.send(200, PAGE.encode(), "text/html; charset=utf-8")
         if self.path == "/api/list":
@@ -122,7 +124,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 PAGE = r"""<!doctype html>
-<html><head><meta charset="utf-8"><title>BAR Replay</title>
+<html><head><meta charset="utf-8"><title>BAR Rewind</title>
 <style>
 :root { --bg:#14161a; --card:#1e2127; --line:#2c3038; --text:#e6e8eb; --dim:#8b919c; --accent:#4f9cf0; --ok:#4caf7d; --bad:#e06464; }
 * { box-sizing:border-box; }
@@ -153,7 +155,7 @@ footer { position:fixed; bottom:0; left:0; right:0; background:var(--card); bord
 .error { color:var(--bad); white-space:pre-wrap; max-height:40vh; overflow:auto; font-family:monospace; }
 </style></head><body>
 <header>
-  <h1>BAR Replay</h1>
+  <h1>BAR Rewind</h1>
   <label for="bar">BAR data folder</label>
   <input id="bar" placeholder="e.g. ~/.local/state/Beyond All Reason">
   <button id="save" onclick="saveFolders()">Save</button>
@@ -225,13 +227,25 @@ for (const id of ['bar', 'out']) {
   $(id).addEventListener('input', markUnsaved);
 }
 load().then(poll);
+setInterval(() => fetch('/api/job'), 20000);
 </script></body></html>"""
+
+last_seen = time.monotonic()
+
+
+def quit_when_page_closed(server):
+    # ponytail: browsers slow hidden-tab timers to ~1/min, so silence must outlast that before quitting
+    while job["running"] or time.monotonic() - last_seen < 90:
+        time.sleep(10)
+    server.shutdown()
+
 
 if __name__ == "__main__":
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     url = f"http://127.0.0.1:{server.server_port}/"
-    print(f"BAR Replay: {url}  (Ctrl+C to quit)", flush=True)
+    print(f"BAR Rewind: {url}  (quits 90 s after the page is closed, or Ctrl+C)", flush=True)
     webbrowser.open(url)
+    threading.Thread(target=quit_when_page_closed, args=(server,), daemon=True).start()
     try:
         server.serve_forever()
     except KeyboardInterrupt:
