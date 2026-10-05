@@ -323,9 +323,8 @@ pub fn main(init: std.process.Init) !void {
     const gpa = std.heap.smp_allocator;
     const args = try init.minimal.args.toSlice(init.arena.allocator());
     if (args.len == 4 and std.mem.eql(u8, args[1], "export-lua")) return exportLua(io, gpa, args[2], args[3]);
-    const exact_poses = args.len == 4 and std.mem.eql(u8, args[3], "--exact-poses");
-    if (args.len != 3 and !exact_poses) {
-        std.log.err("usage: bake <bardump.jsonl> <out.curves> [--exact-poses] | bake export-lua <in.curves> <out-dir>", .{});
+    if (args.len != 3) {
+        std.log.err("usage: bake <bardump.jsonl> <out.curves> | bake export-lua <in.curves> <out-dir>", .{});
         std.process.exit(2);
     }
 
@@ -383,10 +382,10 @@ pub fn main(init: std.process.Init) !void {
         unit.tracks = .{ .first = @intCast(tracks.items.len), .count = 0 };
         const parents: []const u32 = b.parents.get(u.unit.def) orelse &.{};
         const offsets: []const [3]f32 = b.offsets.get(u.unit.def) orelse &.{};
-        // by default BAR's own unit scripts animate pieces from movement and targets (as PA does);
-        // --exact-poses keeps every piece's recorded motion instead
+        // pieces with recorded motion (the dump records it for armed buildings) play from their
+        // curves; everything else is animated by BAR's own unit scripts (as PA does)
         for (u.tracks.items, 1..) |track, piece| {
-            if (track.items.len == 0 or !exact_poses) continue;
+            if (track.items.len == 0) continue;
             // piece space: inverse(parent model matrix) * model matrix, at each of this piece's keys,
             // then as Recoil unit-script Turn angles + Move offsets
             const parent = if (piece - 1 < parents.len) parents[piece - 1] else 0;

@@ -51,6 +51,10 @@ zig build dist                   # dist/bar-replay-linux.tar.gz and dist/bar-rep
   `replay_player` gadget and the timeline widget
 - `tools/pipeline.py`: parse and play (also a CLI, see its header); `tools/ui.py`: the browser app
 
+## AI disclosure
+
+The code was written by AI. I guided it: I came up with the ideas and talked through what to build and how.
+
 ## License
 
 GPL-2.0 (see `LICENSE`), like BAR's own code. Nothing from BAR is included: models, maps and the game

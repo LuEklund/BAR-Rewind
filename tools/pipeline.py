@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Usage: pipeline.py replay <demo.sdfz>   parse once (cached), then play
 #        pipeline.py parse <demo.sdfz>    parse only
-#        pipeline.py play <match.curves> [camera.json shot.png]
+#        pipeline.py play <demo.sdfz> [camera.json shot.png]   (parsed before)
 # The whole pipeline, Linux and Windows, Python stdlib only:
 #   parse: BAR's headless engine re-simulates the replay with lua/dump_replay.lua -> dump -> bake -> .curves
 #   play:  bake export-lua -> the BAR Replay mutator, copied into BAR's games/ folder -> BAR starts
@@ -133,13 +133,12 @@ def curves_path(cfg, demo):
 
 def parse(cfg, demo):
     """Generator: yields ("proc", Popen) once (kill it to cancel), then ("progress", pct, text).
-    Leaves <out>/curves/<name>.curves and .script; raises RuntimeError with the log path on failure."""
+    Leaves <out>/curves/<name>.curves; raises RuntimeError with the log path on failure."""
     bar, demo = Path(cfg["bar_data"]), Path(demo).resolve()
     if script_field(demo_script(demo), "gametype").startswith("BAR Replay"):
         raise RuntimeError(f"{demo.name} is a recording of this player, not a match")
     curves = curves_path(cfg, demo)
     curves.parent.mkdir(parents=True, exist_ok=True)
-    curves.with_suffix(".script").write_text(demo_script(demo))
     # ponytail: cache keyed by file name only; delete <out>/curves/ after a curves format change
     if curves.exists():
         yield "progress", 100, "cached"
@@ -257,10 +256,10 @@ def lua_value(v):
     return "{" + ", ".join(f"[{json.dumps(k)}] = {lua_value(x)}" for k, x in v.items()) + "}"
 
 
-def play(cfg, curves, shot=None):
-    """Starts BAR on the curves and returns its Popen; the caller waits. `shot` = {"camera": json path,
-    "png": out path} plays shot mode. The engine's output goes to <out>/play.log."""
-    bar, out_dir, curves = Path(cfg["bar_data"]), Path(cfg["out_dir"]), Path(curves)
+def play(cfg, demo, shot=None):
+    """Starts BAR on the demo's parsed curves and returns its Popen; the caller waits. `shot` =
+    {"camera": json path, "png": out path} plays shot mode. The engine's output goes to <out>/play.log."""
+    bar, out_dir, curves = Path(cfg["bar_data"]), Path(cfg["out_dir"]), curves_path(cfg, demo)
     out_dir.mkdir(parents=True, exist_ok=True)
     # a copy, not a link: Windows needs admin rights for symlinks
     game = bar / "games" / MUTATOR.name
@@ -272,10 +271,8 @@ def play(cfg, curves, shot=None):
     r = subprocess.run([str(bake_exe()), "export-lua", str(curves), str(game / "replay")], capture_output=True, text=True)
     if r.returncode != 0:
         raise RuntimeError("export failed: " + r.stdout + r.stderr)
-    # the replay's own start script gives the game version and options it ran with; without it the
-    # mutator falls back to the newest installed BAR game and default options
-    script = curves.with_suffix(".script")
-    replay_script = script.read_text() if script.exists() else ""
+    # the replay's own start script gives the game version and options it ran with
+    replay_script = demo_script(demo)
     gametype = script_field(replay_script, "gametype")
     version = gametype if gametype != "?" and not gametype.startswith("BAR Replay") else newest_game(bar)
     modinfo = game / "modinfo.lua"
@@ -369,11 +366,8 @@ def main(argv):
                 print(event[2], flush=True)
         if argv[0] == "parse":
             return
-        curves = curves_path(cfg, argv[1])
-    else:
-        curves = argv[1]
     shot = {"camera": argv[2], "png": argv[3]} if len(argv) >= 4 else None
-    proc = play(cfg, curves, shot)
+    proc = play(cfg, argv[1], shot)
     try:
         proc.wait(timeout=600 if shot else None)
     except subprocess.TimeoutExpired:

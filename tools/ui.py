@@ -49,7 +49,7 @@ def run_job(file, mode):
                 job.update(pct=max(event[1], 0), text=event[2])
         if mode == "play":
             job["text"] = "BAR is starting..."
-            proc = pipeline.play(cfg, pipeline.curves_path(cfg, demo))
+            proc = pipeline.play(cfg, demo)
             if proc.wait() != 0:
                 job["error"] = "play failed:\n" + tail(Path(cfg["out_dir"], "play.log"))
             job["text"] = "BAR closed"

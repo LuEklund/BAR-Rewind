@@ -22,7 +22,6 @@ local S = Spring
 
 local file = nil
 local lastPiece = {} -- [unitID][piece] = last written matrix, only changes are written
-local record_poses = false -- piece motion is only for bake --exact-poses; scripts animate otherwise
 local seenPieces = {} -- [defID] = true once its piece tree is written
 local features = {} -- [featureID] = true
 
@@ -259,7 +258,9 @@ local function unitsSample(us, ps)
 			nu = nu + UNIT_ROW
 
 			if not seenPieces[def] then writePieces(u, def) end
-			if record_poses then np = recordPieces(u, ps, np) end
+			-- every piece's motion: the player sets pieces from these curves, so turrets point right
+			-- after a seek and walk cycles play in reverse
+			np = recordPieces(u, ps, np)
 		end
 	end
 	for u in pairs(lastPiece) do if not alive[u] then lastPiece[u] = nil end end
@@ -394,7 +395,7 @@ end
 
 -- lifecycle ------------------------------------------------------------------------------------
 
--- first line: "dump" (default), "dump poses" (also every piece's motion, for bake --exact-poses)
+-- first line: "dump <last frame>"
 -- or "shot <frame> <x> <z>" for a reference screenshot
 local function readRequest()
 	local f = io.open(REQUEST, "r")
@@ -404,7 +405,7 @@ local function readRequest()
 	local frame, x, z = line:match("^shot (%d+) ([%d%.]+) ([%d%.]+)")
 	if frame then return { shot = tonumber(frame), x = tonumber(x), z = tonumber(z) } end
 	-- io.open is sandboxed to the write dir; pipeline.py moves the files out
-	return { path = "bardump.jsonl", poses = line:match("poses") ~= nil, last = tonumber(line:match("(%d+)$")) }
+	return { path = "bardump.jsonl", last = tonumber(line:match("(%d+)$")) }
 end
 
 -- reference screenshot mode ---------------------------------------------------------------------
@@ -478,7 +479,6 @@ function widget:GameFrame(frame)
 			S.SendCommands("specfullview 1", "setminspeed 100", "setmaxspeed 100", "setspeed 100")
 		else
 			path = request.path
-			record_poses = request.poses
 			last_frame = request.last
 		end
 	end

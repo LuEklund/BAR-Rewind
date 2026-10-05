@@ -18,7 +18,18 @@ function gadget:Update()
 	-- exercises the widget -> gadget message path the timeline uses
 	if ticks == 20 and shot.seek then Spring.SendLuaRulesMsg("replay:seek " .. shot.seek) end
 	if ticks == 20 and shot.speed then Spring.SendLuaRulesMsg("replay:speed " .. shot.speed) end
-	if ticks == 10 then Spring.SetCameraState(shot.state, 0) end
+	if ticks == 10 then
+		local look = shot.state.look -- { x, y, z, distance }: centre the current camera there instead
+		if look then
+			local s = Spring.GetCameraState()
+			s.px, s.py, s.pz = look[1], look[2], look[3]
+			if s.dist then s.dist = look[4] end
+			if s.height then s.height = look[4] end
+			Spring.SetCameraState(s, 0)
+		else
+			Spring.SetCameraState(shot.state, 0)
+		end
+	end
 	-- bench: ask for 10x sim speed during the lead-in and log what the engine achieves
 	if shot.bench then
 		if ticks == 12 then Spring.SendCommands("setmaxspeed 10", "setspeed 10") end

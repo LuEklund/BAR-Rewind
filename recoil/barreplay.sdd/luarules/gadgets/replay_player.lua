@@ -256,7 +256,7 @@ local function loadRecords()
 			born = u32("units", i, 12), died = u32("units", i, 16),
 			tf = u32("units", i, 20), tfn = u32("units", i, 24),
 			st = u32("units", i, 28), stn = u32("units", i, 32),
-			tr = u32("units", i, 36), trn = u32("units", i, 40),
+			tr = u32("units", i, 44), trn = u32("units", i, 48),
 			tracks = {},
 		}
 		local ud = UnitDefNames[M.defs[u.def] or ""]
@@ -347,14 +347,9 @@ local function spawnUnit(i, r)
 	local u = CreateUnit(name, v[1], v[2], v[3], 0, teamOf(r.team))
 	if not u then return warnOnce("CreateUnit failed: " .. name .. " team " .. r.team) end
 	MoveCtrl.Enable(u)
-	if M.exact_poses then
-		-- an empty Lua unit script replaces BAR's: nothing but the curves moves the pieces
-		Spring.UnitScript.CreateScript(u, {})
-	else
-		-- BAR's own script animates: weapons may aim at the recorded targets but never fire
-		for w = 1, #(UnitDefs[UnitDefNames[name].id].weapons or {}) do
-			Spring.SetUnitWeaponState(u, w, "reloadState", 1e8)
-		end
+	-- BAR's own script animates: weapons may aim at the recorded targets but never fire
+	for w = 1, #(UnitDefs[UnitDefNames[name].id].weapons or {}) do
+		Spring.SetUnitWeaponState(u, w, "reloadState", 1e8)
 	end
 	Spring.SetUnitNoSelect(u, false)
 	-- the engine asks a script for its nano pieces only when it really builds; replay builders
@@ -486,8 +481,9 @@ local function work(u, r, g)
 	end
 end
 
--- scripts animate from state, like PA: moving -> StartMoving (walk cycles), target -> weapons aim
-animate = function(u, r, v)
+-- scripts animate from state, like PA: moving -> StartMoving (walk cycles), target -> weapons aim.
+-- `posed` units have recorded piece motion instead: they only get velocity and builder work
+animate = function(u, r, v, posed)
 	-- velocity from one frame back, inside the current window only: sampling t - 1 across a window
 	-- boundary would swap windows once per unit. On the boundary frame the last motion carries on.
 	local window_start = M.first_frame + win.w * M.windows.size
@@ -498,12 +494,13 @@ animate = function(u, r, v)
 		MoveCtrl.SetVelocity(u, vx, vy, vz)
 		moving = vx * vx + vz * vz > 0.01
 	end
-	if moving ~= r.moving then
+	if moving ~= r.moving and not posed then
 		r.moving = moving
 		callScript(u, moving and "StartMoving" or "StopMoving", 0)
 	end
 	local g = sampleStepW("targets", r.index, 7, t, TG)
 	work(u, r, g)
+	if posed then return end
 	-- scripts need time to turn towards a target: aim at the one recorded AIM_LEAD frames ahead (in
 	-- playback direction), staying inside the loaded window
 	local window_last = window_start + M.windows.size - 1
@@ -582,19 +579,36 @@ local function place(u, r)
 		end
 	end
 	r.u = u
-	if M.exact_poses then
+	-- recorded piece motion: set straight from the curves (right after a seek and in reverse);
+	-- units without any keep BAR's script animation
+	local posed = #r.tracks > 0
+	if posed then
 		pose_unit = r
 		CallAsUnit(u, applyPose)
-	else
-		animate(u, r, v)
 	end
+	animate(u, r, v, posed)
 end
 
 local function syncUnits()
+	-- removals first: after a seek, a building that stood on a spot later must be gone before the
+	-- one standing there at t spawns, or the spawn is blocked
 	for i = 1, #units do
 		local r = units[i]
 		local u = spawned[i]
+		if u and not alive(r, t) then
+			if Spring.ValidUnitID(u) then
+				-- died just now while watching: the engine's death explosion; otherwise vanish quietly
+				local died_now = watching() and r.died > last_t and r.died <= t
+				DestroyUnit(u, false, not died_now)
+			end
+			spawned[i] = nil
+			if live[r.id] == u then live[r.id] = nil end
+		end
+	end
+	for i = 1, #units do
+		local r = units[i]
 		if alive(r, t) then
+			local u = spawned[i]
 			if not u or not Spring.ValidUnitID(u) then
 				u = spawnUnit(i, r)
 				spawned[i] = u
@@ -604,14 +618,6 @@ local function syncUnits()
 				for k = 1, #r.tracks do r.tracks[k].last = nil end
 			end
 			if u then place(u, r) end
-		elseif u then
-			if Spring.ValidUnitID(u) then
-				-- died just now while watching: the engine's death explosion; otherwise vanish quietly
-				local died_now = watching() and r.died > last_t and r.died <= t
-				DestroyUnit(u, false, not died_now)
-			end
-			spawned[i] = nil
-			if live[r.id] == u then live[r.id] = nil end
 		end
 	end
 end
@@ -774,29 +780,36 @@ for _, ud in pairs(UnitDefs) do
 	if stone then tombstones[stone] = true end
 end
 
+-- the curves own features: only the player creates them, engine-made wrecks are refused
+local creating_feature = false
+
 local function syncFeatures()
+	-- removals first, as for units
 	for i = 1, #features do
 		local r = features[i]
 		local f = spawnedFeatures[i]
-		if alive(r, t) then
-			if not f or not Spring.ValidFeatureID(f) then
-				local name = M.fdefs[r.def]
-				if tombstones[name] then
-					-- no RIP signs where commanders fell
-				elseif name and FeatureDefNames[name] then
-					local heading = floor(math.atan2(r.dx, r.dz) * 32768 / math.pi) % 65536
-					creating_feature = true
-					spawnedFeatures[i] = Spring.CreateFeature(name, r.x, r.y, r.z, heading, gaia)
-					liveFeatures[r.id] = spawnedFeatures[i]
-					creating_feature = false
-				else
-					warnOnce("no featuredef " .. tostring(name))
-				end
-			end
-		elseif f then
+		if f and not alive(r, t) then
 			if Spring.ValidFeatureID(f) then Spring.DestroyFeature(f) end
 			spawnedFeatures[i] = nil
 			if liveFeatures[r.id] == f then liveFeatures[r.id] = nil end
+		end
+	end
+	for i = 1, #features do
+		local r = features[i]
+		local f = spawnedFeatures[i]
+		if alive(r, t) and (not f or not Spring.ValidFeatureID(f)) then
+			local name = M.fdefs[r.def]
+			if tombstones[name] then
+				-- no RIP signs where commanders fell
+			elseif name and FeatureDefNames[name] then
+				local heading = floor(math.atan2(r.dx, r.dz) * 32768 / math.pi) % 65536
+				creating_feature = true
+				spawnedFeatures[i] = Spring.CreateFeature(name, r.x, r.y, r.z, heading, gaia)
+				liveFeatures[r.id] = spawnedFeatures[i]
+				creating_feature = false
+			else
+				warnOnce("no featuredef " .. tostring(name))
+			end
 		end
 	end
 end
@@ -873,7 +886,6 @@ end
 function gadget:UnitPreDamaged() return 0, 0 end
 function gadget:FeaturePreDamaged() return 0, 0 end
 
-local creating_feature = false
 function gadget:AllowFeatureCreation()
 	return creating_feature
 end
