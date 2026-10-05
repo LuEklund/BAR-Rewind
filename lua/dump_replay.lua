@@ -487,7 +487,8 @@ function widget:GameFrame(frame)
 		return
 	end
 	if not file and path then
-		file = io.open(path, "w")
+		-- binary mode: text mode writes \r\n on Windows
+		file = io.open(path, "wb")
 		bin = io.open("bardump.bin", "wb")
 		-- file header: magic, format version, floats per unit row
 		if bin then bin:write("BRDB", VFS.PackU32(3, UNIT_ROW)) end

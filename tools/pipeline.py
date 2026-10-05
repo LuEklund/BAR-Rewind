@@ -297,12 +297,18 @@ def latest_screenshot(bar):
 
 # map previews ------------------------------------------------------------------------------------
 
-def find_7z():
+def find_7z(bar):
     for name in ("7z", "7za", "7zz"):
         if shutil.which(name):
             return shutil.which(name)
     for p in (Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "7-Zip/7z.exe",):
         if p.exists():
+            return str(p)
+    # the BAR launcher bundles 7za next to its data folder
+    bundled = Path(bar).parent / "resources" / "app.asar.unpacked" / "node_modules" / "7zip-bin"
+    os_dir = "win" if WINDOWS else "mac" if sys.platform == "darwin" else "linux"
+    for p in sorted(bundled.glob(f"{os_dir}/*/7za*"), key=lambda p: "x64" not in p.parts):
+        if p.is_file():
             return str(p)
     return None
 
@@ -318,8 +324,8 @@ def minimap(bar, name, out):
     if arch.suffix == ".sdz":
         with zipfile.ZipFile(arch) as z:
             smf = next((z.read(n) for n in z.namelist() if n.lower().endswith(".smf")), b"")
-    elif find_7z():
-        smf = subprocess.run([find_7z(), "e", "-so", str(arch), "-r", "*.smf"], capture_output=True).stdout
+    elif find_7z(bar):
+        smf = subprocess.run([find_7z(bar), "e", "-so", str(arch), "-r", "*.smf"], capture_output=True).stdout
     if smf[:15] != b"spring map file":
         return False
     SIZE = 256

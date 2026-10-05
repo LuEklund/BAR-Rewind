@@ -4,6 +4,7 @@
 //! simplified with Douglas-Peucker, then everything is written as flat arrays (see curves.zig).
 
 const std = @import("std");
+const builtin = @import("builtin");
 const curves = @import("curves.zig");
 
 const Unit = curves.Unit;
@@ -333,7 +334,9 @@ pub fn main(init: std.process.Init) !void {
 
     var lines = std.mem.splitScalar(u8, text, '\n');
     var parse_arena: std.heap.ArenaAllocator = .init(gpa);
-    while (lines.next()) |line| {
+    while (lines.next()) |raw| {
+        // dumps written in Windows text mode end lines in \r\n
+        const line = if (builtin.os.tag == .windows) std.mem.trimEnd(u8, raw, "\r") else raw;
         if (line.len < 2) continue;
         try addHeader(&b, line);
     }
