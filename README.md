@@ -1,4 +1,4 @@
-# BAR-Rewind
+# BAR-Rewind - replay rewind tool for Beyond All Reason
 ### (Prototype)
 Rewind, pause and scrub [Beyond All Reason](https://www.beyondallreason.info/) replays, rendered by BAR itself.
 
