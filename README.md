@@ -68,7 +68,7 @@ recording back inside BAR, where you can drag a timeline, play backwards and cha
 ### What's recorded
 
 The parse keeps only the keyframes playback needs: a key is dropped when interpolating without it stays
-within 0.5 elmo. What it records:
+within 0.5 [elmo](#whats-recorded "Recoil distance unit: one map grid square is 8 elmos"). What it records:
 
 - **Every unit:** position, facing, health, build progress, on/off, what its weapon aims at, what it builds
 - **Aim pieces:** each weapon's barrel and everything it hangs from (torso, turret, arms), so a turret
@@ -76,6 +76,20 @@ within 0.5 elmo. What it records:
 - **Projectiles**, **features** (wrecks, trees), **terrain changes** and **build queues**
 
 BAR animates the rest itself, from the recorded movement: walk cycles, idle motion, deaths and explosions.
+
+### How keys are picked
+
+![Keyframe thinning](docs/keyframe_thinning.gif)
+
+1. **Parse:** the engine plays the replay and records every unit every 0.1 s.
+2. **Bake:** per unit, start with only the first and last sample as keys.
+3. Slide a "playback" unit straight between the two keys at constant speed, and measure how far it is
+   from the real unit at each sample's time.
+4. Worst gap over 0.5 [elmo](#whats-recorded "Recoil distance unit: one map grid square is 8 elmos"): keep that sample as a key, then repeat on both halves.
+   Otherwise drop every sample in between.
+
+Being on the right path isn't enough: a unit that idles and then drives off is late compared to the
+straight line, so the moment it starts moving becomes a key.
 
 ### Numbers
 
