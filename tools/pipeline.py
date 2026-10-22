@@ -135,6 +135,8 @@ def parse(cfg, demo):
     """Generator: yields ("proc", Popen) once (kill it to cancel), then ("progress", pct, text).
     Leaves <out>/curves/<name>.curves; raises RuntimeError with the log path on failure."""
     bar, demo = Path(cfg["bar_data"]), Path(demo).resolve()
+    cfgdir = bar / "LuaUI" / "Config"
+    cfgdir.mkdir(parents=True, exist_ok=True)
     if script_field(demo_script(demo), "gametype").startswith("BAR Rewind"):
         raise RuntimeError(f"{demo.name} is a recording of this player, not a match")
     curves = curves_path(cfg, demo)
@@ -149,9 +151,9 @@ def parse(cfg, demo):
     widget.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy(WIDGET, widget)
     for f in ("bardump.jsonl", "bardump.bin"):
-        (bar / f).unlink(missing_ok=True)
+        (cfgdir / f).unlink(missing_ok=True)
     # the widget stops at the replay's last frame (an unfinished replay never reaches GameOver)
-    (bar / "bardump.request").write_text(f"dump {total}\n")
+    (cfgdir / "bardump.request").write_text(f"dump {total}\n")
     engine = engine_dir(bar)
     headless = engine / ("spring-headless" + EXE)
     exe = headless if headless.exists() else engine / ("spring" + EXE)
@@ -172,12 +174,12 @@ def parse(cfg, demo):
                 if pct > shown:
                     shown = pct
                     yield "progress", pct, f"parsing {pct}%"
-        if proc.returncode < 0 or not (bar / "bardump.jsonl").exists():
+        if proc.returncode < 0 or not (cfgdir / "bardump.jsonl").exists():
             raise RuntimeError(f"parse failed (engine exit {proc.returncode}), see {log}")
         yield "progress", 100, "baking"
         tmp = curves.with_suffix(".jsonl")
-        shutil.move(bar / "bardump.jsonl", tmp)
-        shutil.move(bar / "bardump.bin", tmp.with_suffix(".bin"))
+        shutil.move(cfgdir / "bardump.jsonl", tmp)
+        shutil.move(cfgdir / "bardump.bin", tmp.with_suffix(".bin"))
         r = subprocess.run([str(bake_exe()), str(tmp), str(curves)], capture_output=True, text=True)
         with open(log, "a") as out:
             out.write(r.stdout + r.stderr)
@@ -187,7 +189,7 @@ def parse(cfg, demo):
             curves.unlink(missing_ok=True)
             raise RuntimeError(f"bake failed, see {log}")
     finally:
-        (bar / "bardump.request").unlink(missing_ok=True)
+        (cfgdir / "bardump.request").unlink(missing_ok=True)
         widget.unlink(missing_ok=True)
     yield "progress", 100, "parsed"
 
